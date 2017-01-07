@@ -1,0 +1,30 @@
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+		<groupId>ua.in.smartdev.incrementalbuild</groupId>
+		<artifactId>incrementalbuild-project</artifactId>
+		<version>1.0-SNAPSHOT</version>
+	</parent>
+    <artifactId>incrementalbuild-helper-maven-plugin</artifactId>
+	<packaging>maven-plugin</packaging>
+    <name>incrementalbuild-helper-maven-plugin</name>
+    <description>Incremental build helper plugin. Perform different reoutens delegated by incrementalbuild extension.</description>
+
+ 
+    <dependencies>
+        <dependency>
+        <groupId>org.apache.maven</groupId>
+        <artifactId>maven-plugin-api</artifactId>
+        <version>3.0</version>
+    </dependency>
+ 
+    <!-- dependencies to annotations -->
+    <dependency>
+      <groupId>org.apache.maven.plugin-tools</groupId>
+      <artifactId>maven-plugin-annotations</artifactId>
+      <version>3.4</version>
+      <scope>provided</scope>
+    </dependency>
+	
+  </dependencies>
+</project>
