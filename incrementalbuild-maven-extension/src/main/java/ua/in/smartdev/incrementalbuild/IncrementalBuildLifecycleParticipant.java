@@ -44,8 +44,8 @@ public class IncrementalBuildLifecycleParticipant extends AbstractMavenLifecycle
 		helperPlugin.setExecutions(Arrays.asList(doNothingExecution));
 		
 		for(MavenProject project : session.getAllProjects()) {
+			logger.info("[SMART_BUILD] project: " + project.getArtifactId() + " plugins: " + project.getBuildPlugins());
 			project.getModel().getBuild().setPlugins(Arrays.asList(helperPlugin));
-			logger.info("[SMART_BUILD] plugins: " + project.getBuildPlugins());
 		}
 		//request.setGoals(Arrays.asList("ua.in.smartdev.incrementalbuild:incrementalbuild-helper-maven-plugin:doNothing"));
 	}
