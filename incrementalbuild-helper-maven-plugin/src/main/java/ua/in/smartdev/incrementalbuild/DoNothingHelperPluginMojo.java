@@ -8,7 +8,7 @@ import org.apache.maven.plugins.annotations.Mojo;
 
 @Mojo( name = "doNothing", defaultPhase=LifecyclePhase.INITIALIZE)
 public class DoNothingHelperPluginMojo extends AbstractMojo {
-
+	
 	@Override
 	public void execute() throws MojoExecutionException, MojoFailureException {
 		getLog().info( "Everything up-to-date" );
