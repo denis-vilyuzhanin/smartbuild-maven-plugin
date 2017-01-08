@@ -1,6 +1,7 @@
 package ua.in.smartdev.incrementalbuild;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 import org.apache.maven.AbstractMavenLifecycleParticipant;
@@ -22,36 +23,19 @@ public class IncrementalBuildLifecycleParticipant extends AbstractMavenLifecycle
 	@Requirement
 	Logger logger;
 
-	private boolean enabled = true;
-
 	@Parameter(name = "defaultMode", defaultValue = "INCREMENTAL")
 	private BuildMode defaultMode = BuildMode.INCREMENTAL;
 
 	@Parameter(name = "mode", property = "incrementalbuild")
 	private BuildMode mode;
 	
-	private void readProperties(MavenSession session) {
-		Properties sessionProps = session.getUserProperties();
-		
-		if (sessionProps.containsKey(INCREMENTAL_BUILD_ENABLED)) {
-			enabled = Boolean.parseBoolean(
-					sessionProps.getProperty(INCREMENTAL_BUILD_ENABLED, INCREMENTAL_BUILD_ENABLED_DEFAULT));
-		} else if (sessionProps.containsKey("incrementalbuild.enabled")) {
-			enabled = Boolean.parseBoolean(
-					sessionProps.getProperty(INCREMENTAL_BUILD_ENABLED_ALIAS, INCREMENTAL_BUILD_ENABLED_DEFAULT));
-		}
-		
-		
-	}
-
 	@Override
 	public void afterProjectsRead(MavenSession session) throws MavenExecutionException {
 		logger.info("Incremental Build");
-		readProperties(session);
-		
-		if (!enabled) {
+
+		if (!isIncrementalBuildEnabled(session)) {
 			if (logger.isDebugEnabled()) {
-				logger.debug("Incremental build is disabled. incrementalbuild.enabled=" + enabled);
+				logger.debug("Incremental build is disabled");
 			}
 			return;
 		}
@@ -64,19 +48,39 @@ public class IncrementalBuildLifecycleParticipant extends AbstractMavenLifecycle
 		doNothingExecution.addGoal("doNothing");
 		doNothingExecution.setId("UP TO DATE");
 		helperPlugin.setExecutions(Arrays.asList(doNothingExecution));
-
+		MavenProject currentRootProject = session.getCurrentProject();
+		currentRootProject.getContextValue(INCREMENTAL_BUILD_ENABLED);
 		for (MavenProject project : session.getAllProjects()) {
 			logger.info("[SMART_BUILD] project: " + project.getArtifactId() + " plugins: " + project.getBuildPlugins());
 			project.getModel().getBuild().setPlugins(Arrays.asList(helperPlugin));
 		}
 	}
-
-	public boolean isEnabled() {
-		return enabled;
+	
+	private boolean isIncrementalBuildEnabled(MavenSession session) {
+		List<Properties> allProperties = Arrays.asList(
+				session.getUserProperties(),
+				session.getSystemProperties(),
+				session.getCurrentProject().getModel().getProperties());
+		for(Properties properties : allProperties) {
+			Boolean isEnabled = getIncrementalBuildEnabled(properties);
+			if (isEnabled == null) {
+				continue;
+			}
+			return isEnabled;
+		}
+		return INCREMENTAL_BUILD_ENABLED_DEFAULT;
 	}
-
-	public void setEnabled(boolean enabled) {
-		this.enabled = enabled;
+	
+	private Boolean getIncrementalBuildEnabled(Properties properties) {
+		String value;
+		if (properties.containsKey(INCREMENTAL_BUILD_ENABLED)) {
+			value = properties.getProperty(INCREMENTAL_BUILD_ENABLED);
+		} else if (properties.containsKey("incrementalbuild.enabled")) {
+			value = properties.getProperty(INCREMENTAL_BUILD_ENABLED_ALIAS);
+		} else {
+			return null;
+		}
+		return Boolean.parseBoolean(value);
 	}
 
 	public BuildMode getDefaultMode() {

@@ -8,7 +8,7 @@
     <name>baseline-multimodules-simple-pom</name>
 
     <properties>
-        <incrementalbuild.enabled>false</incrementalbuild.enabled>
+        <incrementalbuild.enabled>true</incrementalbuild.enabled>
     </properties>
 
     <build>
