@@ -9,7 +9,7 @@
     <name>incrementalbuild-maven-extension</name>
     <description>True incremental build in maven multi-module project.</description>
 
-    
+
     <build>
         <plugins>
             <plugin>
@@ -28,16 +28,40 @@
         </plugins>
     </build>
     <dependencies>
+
+        <dependency>
+            <groupId>io.reactivex</groupId>
+            <artifactId>rxjava</artifactId>
+            <version>1.2.5</version>
+        </dependency>
+
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-plugin-api</artifactId>
             <version>3.3.9</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-core</artifactId>
             <version>3.3.9</version>
+            <scope>provided</scope>
+        </dependency>
+
+
+        <dependency>
+            <groupId>org.apache.maven.shared</groupId>
+            <artifactId>maven-shared-io</artifactId>
+            <version>3.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.maven.shared</groupId>
+            <artifactId>file-management</artifactId>
+            <version>3.0.0</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- dependencies to annotations -->
