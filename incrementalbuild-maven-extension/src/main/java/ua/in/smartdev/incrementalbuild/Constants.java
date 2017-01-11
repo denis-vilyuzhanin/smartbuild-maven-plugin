@@ -1,6 +1,6 @@
 package ua.in.smartdev.incrementalbuild;
 
-interface Constants {
+public interface Constants {
 
 	String INCREMENTAL_BUILD_ENABLED = "smartdev.incrementalbuild.enabled";
 	String INCREMENTAL_BUILD_ENABLED_ALIAS = "incrementalbuild.enabled";
@@ -8,4 +8,7 @@ interface Constants {
 	
 	
 	String PROJECT_STATE_CONTEXT_ATTRIBUTE = "smartdev.incrementalbuil.project.state";
+	
+	
+	String CURRENT_PROJECT_STATE_CONTEXT_ATTRIBUTE = "smartdev.incrementalbuild.project.state";
 }

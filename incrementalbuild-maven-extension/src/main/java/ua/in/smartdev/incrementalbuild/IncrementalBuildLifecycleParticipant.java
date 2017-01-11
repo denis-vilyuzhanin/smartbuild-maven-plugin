@@ -1,5 +1,6 @@
 package ua.in.smartdev.incrementalbuild;
 
+import static ua.in.smartdev.incrementalbuild.Constants.CURRENT_PROJECT_STATE_CONTEXT_ATTRIBUTE;
 import static ua.in.smartdev.incrementalbuild.Constants.INCREMENTAL_BUILD_ENABLED;
 import static ua.in.smartdev.incrementalbuild.Constants.INCREMENTAL_BUILD_ENABLED_ALIAS;
 import static ua.in.smartdev.incrementalbuild.Constants.INCREMENTAL_BUILD_ENABLED_DEFAULT;
@@ -19,12 +20,28 @@ import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
 
+import rx.Observable;
+import rx.functions.Action1;
+import rx.functions.Func1;
+import ua.in.smartdev.incrementalbuild.managers.IncrementalBuildManager;
+import ua.in.smartdev.incrementalbuild.model.IncrementalBuildSpecification;
+import ua.in.smartdev.incrementalbuild.model.IncrementalBuildStatistic;
+import ua.in.smartdev.incrementalbuild.model.ProjectState;
+import ua.in.smartdev.incrementalbuild.model.ProjectStateUpdateResult;
+import ua.in.smartdev.incrementalbuild.services.StatisticService;
+
 @Component(role = AbstractMavenLifecycleParticipant.class, hint = "incrementalbuild")
 public class IncrementalBuildLifecycleParticipant extends AbstractMavenLifecycleParticipant {
 
 	@Requirement
 	Logger logger;
+	
+	@Requirement
+	IncrementalBuildManager incrementalBuildManager;
 		
+	@Requirement
+	StatisticService statisticService;
+	
 	@Override
 	public void afterProjectsRead(MavenSession session) throws MavenExecutionException {
 		logger.info("Incremental Build");
@@ -45,12 +62,23 @@ public class IncrementalBuildLifecycleParticipant extends AbstractMavenLifecycle
 		doNothingExecution.setId("UP TO DATE");
 		helperPlugin.setExecutions(Arrays.asList(doNothingExecution));
 		
+		List<Observable<ProjectState>> allProjectStates = new ArrayList<Observable<ProjectState>>();
 		for (MavenProject project : session.getAllProjects()) {
+			IncrementalBuildSpecification specification = new IncrementalBuildSpecification();
+			specification.setProjectId(project.getGroupId() + ":" + project.getArtifactId());
+			
+			allProjectStates.add(incrementalBuildManager.discoverProjectState(specification)
+			                                            .doOnNext(attachCurrentStateToMavenProjectContext(project)));
 			
 			logger.info("[SMART_BUILD] project: " + project.getArtifactId() + " plugins: " + project.getBuildPlugins());
-			project.getModel().getBuild().setPlugins(Arrays.asList(helperPlugin));
+			//project.getModel().getBuild().setPlugins(Arrays.asList(helperPlugin));
 		}
-		
+		List<ProjectState> allStates = 
+				Observable.concat(allProjectStates)
+		                  .toList()
+		                  .toBlocking()
+		                  .last();
+		logger.info(allStates.size() + " projects will be rebuilt");
 	}
 	
 	@Override
@@ -58,6 +86,23 @@ public class IncrementalBuildLifecycleParticipant extends AbstractMavenLifecycle
 		if (!isIncrementalBuildEnabled(session)) {
 			return;
 		}
+		logger.info("Remember project state");
+		
+		final int projectsCount = session.getAllProjects().size();
+		List<Observable<ProjectStateUpdateResult>> updateResults = 
+				new ArrayList<Observable<ProjectStateUpdateResult>>(session.getAllProjects().size());
+		for(MavenProject project : session.getAllProjects()) {
+			ProjectState projectState = 
+					(ProjectState) project.getContextValue(CURRENT_PROJECT_STATE_CONTEXT_ATTRIBUTE); 
+			updateResults.add(
+					incrementalBuildManager.updateProjectState(projectState));
+		}
+	
+		Observable.concat(updateResults)
+		          .toList()
+		          .flatMap(buildTotalStatistic())
+		          .subscribe(printStatistic());
+		
 		logger.info("Incremental Build Done");
     }
 	
@@ -92,5 +137,36 @@ public class IncrementalBuildLifecycleParticipant extends AbstractMavenLifecycle
 		return Boolean.parseBoolean(value);
 	}
 
+	private <T extends  ProjectStateUpdateResult> Func1<List<T>, Observable<IncrementalBuildStatistic>> buildTotalStatistic() {
+		return new Func1<List<T>, Observable<IncrementalBuildStatistic>>() {
+
+			@Override
+			public Observable<IncrementalBuildStatistic> call(List<T> allResults) {
+				return statisticService.buildStatistic(allResults);
+			}
+			
+		};
+		
+	}
 	
+	private <T extends IncrementalBuildStatistic> Action1<T> printStatistic() {
+		return new Action1<T>() {
+
+			@Override
+			public void call(T statistic) {
+				logger.info("Total Duration: " + statistic.getTotalBuildDuration());
+			}
+			
+		};
+	}
+	
+	private Action1<ProjectState> attachCurrentStateToMavenProjectContext(final MavenProject mavenProject) {
+		return new Action1<ProjectState>() {
+
+			@Override
+			public void call(ProjectState projectState) {
+				mavenProject.setContextValue(CURRENT_PROJECT_STATE_CONTEXT_ATTRIBUTE, projectState);
+			}
+		};
+	}
 }

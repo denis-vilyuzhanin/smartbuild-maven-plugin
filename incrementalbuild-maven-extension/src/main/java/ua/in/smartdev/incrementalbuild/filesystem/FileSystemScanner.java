@@ -46,19 +46,27 @@ public class FileSystemScanner {
 			}
 			scanner.setScanConductor(new Conductor(subscriber));
 			scanner.scan();
-			if (subscriber.isUnsubscribed()) {
+			
+			if (!sendAll(subscriber, scanner.getIncludedFiles())) {
 				return;
 			}
-			SortedSet<String> filesAndFolders = new TreeSet<String>();
-			filesAndFolders.addAll(Arrays.asList(scanner.getIncludedFiles()));
-			filesAndFolders.addAll(Arrays.asList(scanner.getIncludedDirectories()));
-			for(String file : filesAndFolders) {
-				subscriber.onNext(new File(baseDirectory, file));
+			if (!sendAll(subscriber, scanner.getIncludedDirectories())) {
+				return;
 			}
 			subscriber.onCompleted();
 		} catch (Throwable e) {
 			Exceptions.throwOrReport(error, subscriber);
 		}
+	}
+	
+	private boolean sendAll(final Subscriber<? super File> subscriber, String[] files) {
+		for(String file : files) {
+			if (subscriber.isUnsubscribed()) {
+				return false;
+			}
+			subscriber.onNext(new File(baseDirectory, file));
+		}
+		return true;
 	}
   		
 	static class Conductor implements ScanConductor {
