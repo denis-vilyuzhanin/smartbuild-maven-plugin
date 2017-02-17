@@ -62,22 +62,15 @@ public class IncrementalBuildLifecycleParticipant extends AbstractMavenLifecycle
 		doNothingExecution.setId("UP TO DATE");
 		helperPlugin.setExecutions(Arrays.asList(doNothingExecution));
 		
-		List<Observable<ProjectState>> allProjectStates = new ArrayList<Observable<ProjectState>>();
-		for (MavenProject project : session.getAllProjects()) {
-			IncrementalBuildSpecification specification = new IncrementalBuildSpecification();
-			specification.setProjectId(project.getGroupId() + ":" + project.getArtifactId());
+		List<ProjectState> allStates =
+			Observable.from(session.getAllProjects())
+			          .flatMap(doDiscoverProjectState())
+			          .toList()
+			          .toBlocking()
+			          .last();
 			
-			allProjectStates.add(incrementalBuildManager.discoverProjectState(specification)
-			                                            .doOnNext(attachCurrentStateToMavenProjectContext(project)));
-			
-			logger.info("[SMART_BUILD] project: " + project.getArtifactId() + " plugins: " + project.getBuildPlugins());
-			//project.getModel().getBuild().setPlugins(Arrays.asList(helperPlugin));
-		}
-		List<ProjectState> allStates = 
-				Observable.concat(allProjectStates)
-		                  .toList()
-		                  .toBlocking()
-		                  .last();
+		//logger.info("[SMART_BUILD] project: " + project.getArtifactId() + " plugins: " + project.getBuildPlugins());
+		//project.getModel().getBuild().setPlugins(Arrays.asList(helperPlugin));
 		logger.info(allStates.size() + " projects will be rebuilt");
 	}
 	
@@ -88,20 +81,11 @@ public class IncrementalBuildLifecycleParticipant extends AbstractMavenLifecycle
 		}
 		logger.info("Remember project state");
 		
-		final int projectsCount = session.getAllProjects().size();
-		List<Observable<ProjectStateUpdateResult>> updateResults = 
-				new ArrayList<Observable<ProjectStateUpdateResult>>(session.getAllProjects().size());
-		for(MavenProject project : session.getAllProjects()) {
-			ProjectState projectState = 
-					(ProjectState) project.getContextValue(CURRENT_PROJECT_STATE_CONTEXT_ATTRIBUTE); 
-			updateResults.add(
-					incrementalBuildManager.updateProjectState(projectState));
-		}
-	
-		Observable.concat(updateResults)
+		Observable.from(session.getAllProjects())
+		          .flatMap(doUpdateProjectState())
 		          .toList()
-		          .flatMap(buildTotalStatistic())
-		          .subscribe(printStatistic());
+		          .flatMap(doBuildTotalStatistic())
+		          .subscribe(doPrintStatistic());
 		
 		logger.info("Incremental Build Done");
     }
@@ -137,11 +121,11 @@ public class IncrementalBuildLifecycleParticipant extends AbstractMavenLifecycle
 		return Boolean.parseBoolean(value);
 	}
 
-	private <T extends  ProjectStateUpdateResult> Func1<List<T>, Observable<IncrementalBuildStatistic>> buildTotalStatistic() {
-		return new Func1<List<T>, Observable<IncrementalBuildStatistic>>() {
+	Func1<List<ProjectStateUpdateResult>, Observable<IncrementalBuildStatistic>> doBuildTotalStatistic() {
+		return new Func1<List<ProjectStateUpdateResult>, Observable<IncrementalBuildStatistic>>() {
 
 			@Override
-			public Observable<IncrementalBuildStatistic> call(List<T> allResults) {
+			public Observable<IncrementalBuildStatistic> call(List<ProjectStateUpdateResult> allResults) {
 				return statisticService.buildStatistic(allResults);
 			}
 			
@@ -149,18 +133,18 @@ public class IncrementalBuildLifecycleParticipant extends AbstractMavenLifecycle
 		
 	}
 	
-	private <T extends IncrementalBuildStatistic> Action1<T> printStatistic() {
-		return new Action1<T>() {
+	Action1<IncrementalBuildStatistic> doPrintStatistic() {
+		return new Action1<IncrementalBuildStatistic>() {
 
 			@Override
-			public void call(T statistic) {
+			public void call(IncrementalBuildStatistic statistic) {
 				logger.info("Total Duration: " + statistic.getTotalBuildDuration());
 			}
 			
 		};
 	}
 	
-	private Action1<ProjectState> attachCurrentStateToMavenProjectContext(final MavenProject mavenProject) {
+	Action1<ProjectState> doAttachCurrentStateToMavenProjectContext(final MavenProject mavenProject) {
 		return new Action1<ProjectState>() {
 
 			@Override
@@ -169,4 +153,29 @@ public class IncrementalBuildLifecycleParticipant extends AbstractMavenLifecycle
 			}
 		};
 	}
+	
+	Func1<MavenProject, Observable<ProjectStateUpdateResult>> doUpdateProjectState() {
+		return new Func1<MavenProject, Observable<ProjectStateUpdateResult>>() {
+
+			@Override
+			public Observable<ProjectStateUpdateResult> call(MavenProject project) {
+				ProjectState currentState = 
+						(ProjectState) project.getContextValue(CURRENT_PROJECT_STATE_CONTEXT_ATTRIBUTE);
+				return incrementalBuildManager.updateProjectState(currentState);
+			}
+			
+		};
+	}
+	
+	Func1<MavenProject, Observable<ProjectState>> doDiscoverProjectState() {
+		return new Func1<MavenProject, Observable<ProjectState>>() {
+
+			@Override
+			public Observable<ProjectState> call(MavenProject project) {
+				return incrementalBuildManager.discoverProjectState(project)
+				                              .doOnNext(doAttachCurrentStateToMavenProjectContext(project));
+			}
+		};
+	}
+	
 }

@@ -7,15 +7,6 @@ import rx.functions.Func1;
 
 public class FileState {
 
-	public static final Func1<File, FileState> FILE_TO_STATE = new Func1<File, FileState>() {
-
-		@Override
-		public FileState call(File file) {
-			return new FileState(file, new Date(file.lastModified()));
-		}
-	};
-	
-	
 	private File file;
 	private Date lastModifiedDate;
 	

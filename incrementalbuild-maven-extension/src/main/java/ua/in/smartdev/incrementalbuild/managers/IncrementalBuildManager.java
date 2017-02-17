@@ -1,14 +1,11 @@
 package ua.in.smartdev.incrementalbuild.managers;
 
-import java.util.List;
-
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
 
 import rx.Observable;
-
 import ua.in.smartdev.incrementalbuild.model.IncrementalBuildSpecification;
 import ua.in.smartdev.incrementalbuild.model.ProjectState;
 import ua.in.smartdev.incrementalbuild.model.ProjectStateUpdateResult;
@@ -21,9 +18,14 @@ public class IncrementalBuildManager {
 	Logger logger;
 	
 	
-	public Observable<ProjectState> discoverProjectState(IncrementalBuildSpecification specification) {
+	public Observable<ProjectState> discoverProjectState(MavenProject mavenProject) {
+		String projectId = mavenProject.getGroupId() + ":" + mavenProject.getArtifactId();
+		IncrementalBuildSpecification specification = new IncrementalBuildSpecification();
+		specification.setProjectId(projectId);
+		
 		ProjectState currentState = new ProjectState();
-		currentState.setProjectId(specification.getProjectId());
+		currentState.setProjectId(projectId);
+		currentState.setMavenProject(mavenProject);
 		return Observable.just(currentState);
 	}
 	
